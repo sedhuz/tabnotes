@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Untitled Note</title>
+    <link id="favicon" rel="icon"
+        href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAQAAACENn+AAAAADElEQVR42mNkYGBgYAAAAgAB9HFcXQAAAABJRU5ErkJggg==" />
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            font-size: 1.2rem;
+            margin: 0.5rem 0;
+            padding: 0.3rem;
+            box-sizing: border-box;
+        }
+
+        input#iconUrl {
+            font-size: 1rem;
+        }
+
+        textarea {
+            height: 60vh;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 1rem;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <label for="titleInput">Note Title:</label>
+    <input type="text" id="titleInput" placeholder="Enter note title..." autocomplete="off" />
+
+    <label for="iconUrl">Favicon URL:</label>
+    <input type="text" id="iconUrl" placeholder="Enter image URL for favicon (png, svg, ico)" autocomplete="off" />
+
+    <label for="contentInput">Note Content:</label>
+    <textarea id="contentInput" placeholder="Write your note here..."></textarea>
+
+    <script>
+        (() => {
+            const titleInput = document.getElementById('titleInput');
+            const iconUrlInput = document.getElementById('iconUrl');
+            const contentInput = document.getElementById('contentInput');
+            const favicon = document.getElementById('favicon');
+
+            // Sanitize a string to URL-friendly slug
+            function slugify(text) {
+                return text.toString().toLowerCase()
+                    .trim()
+                    .replace(/\s+/g, '-')       // Replace spaces with -
+                    .replace(/[^\w\-]+/g, '')   // Remove all non-word chars
+                    .replace(/\-\-+/g, '-');    // Replace multiple - with single -
+            }
+
+            // Get current note key based on hash
+            function getNoteKey() {
+                let key = location.hash.slice(1);
+                if (!key) key = "default";
+                return `noteApp-data-${key}`;
+            }
+
+            // Load note from localStorage by key
+            function loadNote(key) {
+                const saved = localStorage.getItem(key);
+                if (!saved) return false;
+                try {
+                    const data = JSON.parse(saved);
+                    titleInput.value = data.title || "";
+                    iconUrlInput.value = data.icon || "";
+                    contentInput.value = data.content || "";
+                    updatePage(data.title, data.icon);
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            // Save note to localStorage by key
+            function saveNote(key) {
+                const data = {
+                    title: titleInput.value.trim(),
+                    icon: iconUrlInput.value.trim(),
+                    content: contentInput.value,
+                };
+                localStorage.setItem(key, JSON.stringify(data));
+                updatePage(data.title, data.icon);
+            }
+
+            // Update page title and favicon
+            function updatePage(title, icon) {
+                document.title = title || "Untitled Note";
+                if (icon) {
+                    favicon.href = icon;
+                } else {
+                    favicon.href = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAQAAACENn+AAAAADElEQVR42mNkYGBgYAAAAgAB9HFcXQAAAABJRU5ErkJggg==";
+                }
+            }
+
+            let currentKey = getNoteKey();
+
+            // Load initial note
+            if (!loadNote(currentKey)) {
+                // No saved note for this key, set default title
+                document.title = "Untitled Note";
+            }
+
+            // Debounced save function
+            let saveTimeout;
+            function scheduleSave() {
+                clearTimeout(saveTimeout);
+
+                // On title change, update hash and switch keys if slug differs
+                const newSlug = slugify(titleInput.value.trim()) || "default";
+                if (newSlug !== currentKey.slice("noteApp-data-".length)) {
+                    // Save old note before switching key
+                    saveNote(currentKey);
+                    currentKey = `noteApp-data-${newSlug}`;
+
+                    // Update URL hash without page jump
+                    history.replaceState(null, "", "#" + newSlug);
+
+                    // Try load existing note for new slug or clear inputs
+                    if (!loadNote(currentKey)) {
+                        iconUrlInput.value = "";
+                        contentInput.value = "";
+                        updatePage(titleInput.value, "");
+                    }
+                }
+
+                saveTimeout = setTimeout(() => saveNote(currentKey), 300);
+            }
+
+            titleInput.addEventListener('input', scheduleSave);
+            iconUrlInput.addEventListener('input', scheduleSave);
+            contentInput.addEventListener('input', scheduleSave);
+
+            // Optional: Save on page unload
+            window.addEventListener('beforeunload', () => saveNote(currentKey));
+        })();
+    </script>
+
+</body>
+
+</html>
